@@ -119,11 +119,31 @@ def _click_send() -> None:
     )
 
 def _poll_for_response(min_count: int = 2) -> str:
-    """Poll for Gemini response — min_count=2 for query (prompt has marker), 1 for session."""
+    """Poll with 3-layer guard — min_count=2 for query (prompt has marker), 1 for session."""
+    last_text = ""
+    stable_count = 0
+
     for attempt in range(1, (MAX_WAIT // POLL_INTERVAL) + 1):
         time.sleep(POLL_INTERVAL); snap = _snapshot()
-        if 'CONNECTION_LOST' in snap: return snap
-        current_text = _eval_js(
+        if 'CONNECTION_LOST' in snap:
+            time.sleep(POLL_INTERVAL); snap = _snapshot()
+            if 'CONNECTION_LOST' in snap: return snap
+
+        # LAYER 1 — Busy state detection
+        is_busy = _eval_js(
+            "(function(){"
+            "const stop=document.querySelector("
+            "'[aria-label*=\"Stop\"],button[aria-label*=\"Stop\"],"
+            "[data-test-id=\"stop-button\"]');"
+            "return stop&&!stop.disabled?'busy':'idle';"
+            "})()"
+        ).strip().strip('"')
+        if 'busy' in is_busy:
+            stable_count = 0
+            continue
+
+        # Extract text (markers first, then fallback)
+        raw = _eval_js(
             "(function(){"
             "const body=document.body.innerText;"
             "const count=(body.match(/Start:>/g)||[]).length;"
@@ -135,26 +155,37 @@ def _poll_for_response(min_count: int = 2) -> str:
             "if(text.length<5)return'';"
             "return text;"
             "})()"
-        )
-        if current_text:
-            print(f"  [Polled {attempt} time(s), response received]", file=sys.stderr)
-            return f"[Polled {attempt}x] {current_text}"
-        # Fallback: Gemini didn't use markers
-        fallback = _eval_js(
-            "(function(){"
-            "const body=document.body.innerText;"
-            "const said=body.lastIndexOf('Gemini said');"
-            "if(said<0)return'';"
-            "let t=body.substring(said+12);"
-            "const tools=t.indexOf('Tools');"
-            "if(tools>0)t=t.substring(0,tools);"
-            "return t.trim();"
-            "})()"
         ).strip().strip('"')
-        if fallback and len(fallback) > 5:
-            print(f"  [Polled {attempt} time(s), Gemini said fallback]", file=sys.stderr)
-            return f"[Polled {attempt}x] {fallback}"
-    print(f"  [Timed out after {MAX_WAIT//POLL_INTERVAL} polls]", file=sys.stderr)
+        if not raw or len(raw) < 5:
+            raw = _eval_js(
+                "(function(){"
+                "const body=document.body.innerText;"
+                "const said=body.lastIndexOf('Gemini said');"
+                "if(said<0)return'';"
+                "let t=body.substring(said+12);"
+                "const tools=t.indexOf('Tools');"
+                "if(tools>0)t=t.substring(0,tools);"
+                "return t.trim();"
+                "})()"
+            ).strip().strip('"')
+        if not raw or len(raw) < 3:
+            continue
+
+        # LAYER 3 — Closing marker gate
+        if 'Start:>' in raw and '<:End' not in raw:
+            stable_count = 0
+            continue
+
+        # LAYER 2 — Stability check
+        if raw == last_text and len(raw) > 10:
+            stable_count += 1
+            if stable_count >= 2:
+                print(f"  [Polled {attempt} time(s), response stable]", file=sys.stderr)
+                return f"[Polled {attempt}x] {raw}"
+        else:
+            stable_count = 0
+            last_text = raw
+
     return ""
 
 def extract_response(raw_text: str) -> str:
