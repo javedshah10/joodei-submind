@@ -1,0 +1,26 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Chrome profiles
+*submind-chatgpt-profile/
+*submind-gemini-profile/
+agent-browser-profile/
+gemini-profile/
+
+# Output directories
+chatgpt_images/
+gemini/docs/
+submind/gemini/docs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
