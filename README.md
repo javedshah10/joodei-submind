@@ -10,7 +10,7 @@ Your AI agent already runs on an expensive model. Why pay again for ChatGPT/Gemi
 |----------|-------|-------------|
 | **ChatGPT** | 8 tools | Query, session, image generation, image I/O, session management |
 | **Gemini** | 7 tools | Query, session, document generation, session management, resume |
-| **Memory** | 4 tools | Save, search, retrieve, list recent — PostgreSQL-backed |
+| **Memory** | 4 tools | Save, search, retrieve, list recent — SQLite/PostgreSQL-backed |
 
 ## Quick Start
 
@@ -26,21 +26,36 @@ python setup_accounts.py
 ```
 Opens ChatGPT → you log in → press Enter. Opens Gemini → you log in → press Enter. Sessions persist forever via Chrome profile cookies.
 
-### 3. Configure environment
-Edit `.env`:
-```
-GROQ_API_KEY=your_key    # for browser_agent.py LLM router
-GOOGLE_API_KEY=your_key  # optional
+### 3. Verify paths
+Copy `.env.example` to `.env` and review the defaults. All paths default to `%USERPROFILE%` subdirectories — customize only if your Chrome or agent-browser is installed in a non-standard location.
+
+### 4. Connect to Your AI Client
+
+SubMind works with any MCP-compatible AI client.
+Add the following to your client's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "submind": {
+      "command": "python",
+      "args": ["-u", "path/to/submind/joodei_browser_mcp.py", "--transport", "stdio"],
+      "env": {"PYTHONUNBUFFERED": "1"}
+    }
+  }
+}
 ```
 
-### 4. Verify paths
-Open `chatgpt_delegate.py` and `gemini.py` — check the `AGENT_BROWSER`, `CHROME_EXE`, and `PROFILE` paths at the top.
+| Client | Config File Location |
+|--------|---------------------|
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Claude Code | `claude mcp add submind python path/to/joodei_browser_mcp.py` |
+| OpenCode | `opencode.json` in project root |
+| Cursor | `.cursor/mcp.json` in project root |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Any MCP client | HTTP mode: `python joodei_browser_mcp.py` → `http://localhost:8765` |
 
-### 5. Start the MCP server
-```bash
-python joodei_browser_mcp.py --transport stdio
-```
-Add this to your Claude Desktop or OpenCode config — see `opencode.json` for reference.
+See [docs/setup.md](docs/setup.md) for detailed per-client instructions.
 
 ## Platform Support
 
@@ -48,7 +63,6 @@ Add this to your Claude Desktop or OpenCode config — see `opencode.json` for r
 |----------|--------|-------------|
 | ChatGPT | Stable | Query, session (5 loops), DALL-E images, session management |
 | Gemini | Stable | Query, session (10 rounds), PDF/MD/XLSX docs, session management |
-| X (Twitter) | Disabled | CDP-based; login blocked by anti-automation. Code complete. |
 
 ## Token Efficiency
 
@@ -65,7 +79,8 @@ SubMind saves ~90% of context tokens by keeping your agent as orchestrator, not 
 ```
 ┌──────────────────────────────────────────────┐
 │                 Your AI Agent                 │
-│          (OpenCode / Claude Desktop)          │
+│  (Claude / OpenCode / Cursor / Windsurf /     │
+│           Any MCP Client)                      │
 └──────────────────┬───────────────────────────┘
                    │ MCP protocol (stdio/HTTP)
 ┌──────────────────▼───────────────────────────┐
@@ -73,13 +88,13 @@ SubMind saves ~90% of context tokens by keeping your agent as orchestrator, not 
 │          FastMCP server — 19 tools            │
 ├────────┬──────────────┬──────────────────────┤
 │ ChatGPT│   Gemini     │   Memory Brain        │
-│delegate│  delegate    │   (PostgreSQL)        │
+│delegate│  delegate    │   (SQLite/PostgreSQL) │
 ├────────┴──────────────┴──────────────────────┤
 │           agent-browser (Node)                │
 │      Chrome CDP — real browser control        │
 ├──────────────────────────────────────────────┤
-│         Google Chrome (3 profiles)            │
-│  agent-browser-profile | gemini-profile       │
+│         Google Chrome (2 profiles)            │
+│  chatgpt-profile | gemini-profile             │
 └──────────────────────────────────────────────┘
 ```
 
@@ -98,10 +113,9 @@ SubMind saves ~90% of context tokens by keeping your agent as orchestrator, not 
 | `joodei_browser_mcp.py` | MCP server exposing 19 tools via FastMCP |
 | `chatgpt_delegate.py` | ChatGPT browser automation (863 lines) |
 | `gemini.py` | Gemini browser automation (553 lines) |
-| `memory_brain.py` | PostgreSQL memory CRUD |
-| `browser_agent.py` | LLM agent router (optional) |
+| `memory_brain.py` | SQLite/PostgreSQL memory with zero-setup fallback |
 | `setup_accounts.py` | One-time Chrome profile login wizard |
-| `opencode.json` | Example MCP config for OpenCode |
+| `.env.example` | Environment configuration template |
 
 ## Contributing
 
