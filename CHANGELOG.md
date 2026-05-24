@@ -43,7 +43,6 @@
 
 ### Known Limitations
 
-- **X (Twitter) disabled** — CDP detection blocks login; adapter code is complete but tool is disabled in MCP server
 - **Gemini text injection** — Must use `agent-browser type` (real keystrokes); JS injection breaks React send button on rich-textarea custom element
 - **ChatGPT image mode** — Whole-page estuary search needed; image mode has no `data-message-author-role` attribute
 - **Windows only** — Paths use Windows conventions; Chrome profile paths are platform-specific
